@@ -1,8 +1,6 @@
 /**
- * Cubiku — 3D Sudoku frontend (100% Client-Side Engine)
+ * Cubiku Base Game — 3D Sudoku frontend (100% Client-Side Engine)
  */
-
-let currentVariant = "standard";
 
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -12,7 +10,7 @@ function shuffleArray(array) {
   return array;
 }
 
-function isValid(grid, x, y, z, num, n = 3, variant = currentVariant) {
+function isValid(grid, x, y, z, num, n = 3) {
   for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
           if (grid[z][i][j] === num) return false;
@@ -20,25 +18,10 @@ function isValid(grid, x, y, z, num, n = 3, variant = currentVariant) {
           if (grid[i][j][x] === num) return false;
       }
   }
-
-  if (variant === '3d-anti-king') {
-      const offsets = [-1, 1];
-      for (let dz of offsets) {
-          for (let dy of offsets) {
-              for (let dx of offsets) {
-                  let nz = z + dz, ny = y + dy, nx = x + dx;
-                  if (nz >= 0 && nz < n && ny >= 0 && ny < n && nx >= 0 && nx < n) {
-                      if (grid[nz][ny][nx] === num) return false;
-                  }
-              }
-          }
-      }
-  }
-  
   return true;
 }
 
-function solveAndCount(grid, n = 3, count = { val: 0 }, variant = currentVariant) {
+function solveAndCount(grid, n = 3, count = { val: 0 }) {
   if (count.val > 1) return;
 
   for (let z = 0; z < n; z++) {
@@ -46,9 +29,9 @@ function solveAndCount(grid, n = 3, count = { val: 0 }, variant = currentVariant
           for (let x = 0; x < n; x++) {
               if (grid[z][y][x] === 0) {
                   for (let num = 1; num <= n * n; num++) {
-                      if (isValid(grid, x, y, z, num, n, variant)) {
+                      if (isValid(grid, x, y, z, num, n)) {
                           grid[z][y][x] = num;
-                          solveAndCount(grid, n, count, variant);
+                          solveAndCount(grid, n, count);
                           grid[z][y][x] = 0;
                       }
                   }
@@ -60,7 +43,7 @@ function solveAndCount(grid, n = 3, count = { val: 0 }, variant = currentVariant
   count.val += 1;
 }
 
-function generateSolvedGrid(grid, n = 3, variant = currentVariant) {
+function generateSolvedGrid(grid, n = 3) {
   const cells = [];
   for (let z = 0; z < n; z++) {
       for (let y = 0; y < n; y++) {
@@ -76,9 +59,9 @@ function generateSolvedGrid(grid, n = 3, variant = currentVariant) {
           shuffleArray(nums);
 
           for (const num of nums) {
-              if (isValid(grid, x, y, z, num, n, variant)) {
+              if (isValid(grid, x, y, z, num, n)) {
                   grid[z][y][x] = num;
-                  if (generateSolvedGrid(grid, n, variant)) return true;
+                  if (generateSolvedGrid(grid, n)) return true;
                   grid[z][y][x] = 0;
               }
           }
@@ -88,7 +71,7 @@ function generateSolvedGrid(grid, n = 3, variant = currentVariant) {
   return true;
 }
 
-function generateUniquePuzzle(n = 3, difficulty = 'medium', variant = currentVariant) {
+function generateUniquePuzzle(n = 3, difficulty = 'medium') {
   const grid = Array.from({ length: n }, () =>
       Array.from({ length: n }, () => Array(n).fill(0))
   );
@@ -98,7 +81,7 @@ function generateUniquePuzzle(n = 3, difficulty = 'medium', variant = currentVar
   while (!generated && safetyLimit < 10) {
       safetyLimit++;
       grid.forEach(z => z.forEach(y => y.fill(0)));
-      generated = generateSolvedGrid(grid, n, variant);
+      generated = generateSolvedGrid(grid, n);
   }
 
   const solvedCopy = JSON.parse(JSON.stringify(grid));
@@ -113,8 +96,7 @@ function generateUniquePuzzle(n = 3, difficulty = 'medium', variant = currentVar
   }
   shuffleArray(cells);
 
-  const isVariant = variant !== 'standard';
-  const targetMinClues = difficulty === 'easy' ? (isVariant ? 10 : 12) : (difficulty === 'medium' ? (isVariant ? 7 : 10) : (isVariant ? 5 : 8));
+  const targetMinClues = difficulty === 'easy' ? 12 : (difficulty === 'medium' ? 10 : 8);
   let currentClues = n * n * n;
 
   for (const { z, y, x } of cells) {
@@ -125,7 +107,7 @@ function generateUniquePuzzle(n = 3, difficulty = 'medium', variant = currentVar
 
       const gridCopy = JSON.parse(JSON.stringify(grid));
       const solutions = { val: 0 };
-      solveAndCount(gridCopy, n, solutions, variant);
+      solveAndCount(gridCopy, n, solutions);
 
       if (solutions.val !== 1) {
           grid[z][y][x] = backup; 
@@ -146,13 +128,13 @@ function generateUniquePuzzle(n = 3, difficulty = 'medium', variant = currentVar
   return { grid, clues, solvedGrid: solvedCopy };
 }
 
-function generateGame(difficulty = 'medium', variant = currentVariant) {
+function generateGame(difficulty = 'medium') {
   let attempts = 0;
   let bestClues = null;
   let bestSolved = null;
   while (attempts < 15) {
       attempts++;
-      const { grid, clues, solvedGrid: candidateSolved } = generateUniquePuzzle(3, difficulty, variant);
+      const { grid, clues, solvedGrid: candidateSolved } = generateUniquePuzzle(3, difficulty);
       bestClues = clues;
       bestSolved = candidateSolved;
       solvedGrid = candidateSolved;
@@ -161,7 +143,7 @@ function generateGame(difficulty = 'medium', variant = currentVariant) {
   return bestClues;
 }
 
-function check3SSC(grid, n = 3, variant = currentVariant) {
+function check3SSC(grid, n = 3) {
   const conflicts = new Set();
   const addConflict = (z, y, x) => conflicts.add(`${z},${y},${x}`);
 
@@ -215,28 +197,6 @@ function check3SSC(grid, n = 3, variant = currentVariant) {
       }
       for (const num in seen) {
           if (seen[num].length > 1) seen[num].forEach(({ z, y }) => addConflict(z, y, x));
-      }
-  }
-
-  if (variant === '3d-anti-king') {
-      for (let z = 0; z < n; z++) {
-          for (let y = 0; y < n; y++) {
-              for (let x = 0; x < n; x++) {
-                  const num = grid[z][y][x];
-                  const offsets = [-1, 1];
-                  for (let dz of offsets) {
-                      for (let dy of offsets) {
-                          for (let dx of offsets) {
-                              let nz = z + dz, ny = y + dy, nx = x + dx;
-                              if (nz >= 0 && nz < n && ny >= 0 && ny < n && nx >= 0 && nx < n && grid[nz][ny][nx] === num) {
-                                  addConflict(z, y, x);
-                                  addConflict(nz, ny, nx);
-                              }
-                          }
-                      }
-                  }
-              }
-          }
       }
   }
 
@@ -303,7 +263,6 @@ function savePreferences() {
   localStorage.setItem('cubiku_prefs', JSON.stringify({
     theme: currentTheme,
     sticky: stickyKeysEnabled,
-    variant: currentVariant,
     difficulty: currentDifficulty
   }));
 }
@@ -315,7 +274,6 @@ function loadPreferences() {
       const prefs = JSON.parse(savedPrefs);
       currentTheme = prefs.theme || "cyan";
       stickyKeysEnabled = !!prefs.sticky;
-      currentVariant = prefs.variant || "standard";
       currentDifficulty = prefs.difficulty || "medium";
       
       document.body.setAttribute('data-theme', currentTheme);
@@ -324,9 +282,6 @@ function loadPreferences() {
       
       const stickyToggle = document.getElementById('toggle-sticky-keys');
       if (stickyToggle) stickyToggle.checked = stickyKeysEnabled;
-
-      const variantSelect = document.getElementById('variant-select');
-      if (variantSelect) variantSelect.value = currentVariant;
       
       const diffSelect = document.getElementById('difficulty-select');
       if (diffSelect) diffSelect.value = currentDifficulty;
@@ -419,7 +374,6 @@ function saveGame() {
     solvedGrid,
     clues: Array.from(clueSet),
     difficulty: currentDifficulty,
-    variant: currentVariant,
     timer: timerSeconds
   };
   localStorage.setItem('cubiku_save', JSON.stringify(saveData));
@@ -441,19 +395,19 @@ function computeSolutionGrid() {
     }
   }
   const solved = JSON.parse(JSON.stringify(grid));
-  solveGridHelper(solved, 3, currentVariant);
+  solveGridHelper(solved, 3);
   return solved;
 }
 
-function solveGridHelper(grid, n = 3, variant = currentVariant) {
+function solveGridHelper(grid, n = 3) {
   for (let z = 0; z < n; z++) {
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
         if (grid[z][y][x] === 0) {
           for (let num = 1; num <= n * n; num++) {
-            if (isValid(grid, x, y, z, num, n, variant)) {
+            if (isValid(grid, x, y, z, num, n)) {
               grid[z][y][x] = num;
-              if (solveGridHelper(grid, n, variant)) return true;
+              if (solveGridHelper(grid, n)) return true;
               grid[z][y][x] = 0;
             }
           }
@@ -485,7 +439,6 @@ function loadGame() {
     solvedGrid = data.solvedGrid || computeSolutionGrid();
     clueSet = new Set(data.clues);
     currentDifficulty = data.difficulty || "medium";
-    currentVariant = data.variant || 'standard';
     timerSeconds = data.timer;
     undoStack = [];
     isGameComplete = false; 
@@ -495,9 +448,6 @@ function loadGame() {
     
     const diffSelect = document.getElementById('difficulty-select');
     if (diffSelect) diffSelect.value = currentDifficulty;
-
-    const varSelect = document.getElementById('variant-select');
-    if (varSelect) varSelect.value = currentVariant;
 
     updateStatsUI(); 
     
@@ -593,11 +543,8 @@ function endTutorial() {
     
     setTimeout(() => {
        currentDifficulty = 'easy';
-       currentVariant = 'standard';
        const diffSelect = document.getElementById('difficulty-select');
        if (diffSelect) diffSelect.value = 'easy';
-       const varSelect = document.getElementById('variant-select');
-       if (varSelect) varSelect.value = 'standard';
        updateStatsUI();
        newGame();
     }, 15000); 
@@ -892,22 +839,6 @@ function removeDraftFromPeers(z, row, col, digit) {
         }
     }
     
-    if (currentVariant === '3d-anti-king') {
-        const offsets = [-1, 1];
-        for (let dz of offsets) {
-            for (let dy of offsets) {
-                for (let dx of offsets) {
-                    let nz = z + dz, ny = row + dy, nx = col + dx;
-                    if (nz >= 0 && nz < 3 && ny >= 0 && ny < 3 && nx >= 0 && nx < 3) {
-                        if (drafts[nz][ny][nx].has(digit)) {
-                            affected.push({z: nz, r: ny, c: nx});
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
     const uniqueAffected = [];
     const seen = new Set();
     for (const cell of affected) {
@@ -1085,24 +1016,10 @@ function flashConflicts(z, row, col, value) {
     if (c !== col && state[z][row][c] === value) clashEls.push(getCell(z, row, c));
   }
   for (let r = 0; r < 3; r++) {
-    if (r !== row && state[z][r][col] === value) clashEls.push(getCell(z, row, col));
+    if (r !== row && state[z][r][col] === value) clashEls.push(getCell(z, r, col));
   }
   for (let oz = 0; oz < 3; oz++) {
     if (oz !== z && state[oz][row][col] === value) clashEls.push(getCell(oz, row, col));
-  }
-  
-  if (currentVariant === '3d-anti-king') {
-      const offsets = [-1, 1];
-      for (let dz of offsets) {
-          for (let dy of offsets) {
-              for (let dx of offsets) {
-                  let nz = z + dz, ny = row + dy, nx = col + dx;
-                  if (nz >= 0 && nz < 3 && ny >= 0 && ny < 3 && nx >= 0 && nx < 3 && state[nz][ny][nx] === value) {
-                      clashEls.push(getCell(nz, ny, nx));
-                  }
-              }
-          }
-      }
   }
 
   clashEls.forEach(el => {
@@ -1321,7 +1238,7 @@ async function newGame() {
   await new Promise(resolve => setTimeout(resolve, 50));
 
   try {
-    const clues = generateGame(currentDifficulty, currentVariant);
+    const clues = generateGame(currentDifficulty);
 
     state = emptyGrid();
     drafts = emptyDrafts();
@@ -1340,8 +1257,7 @@ async function newGame() {
     updateDepletion(); 
     startTimer();
     saveGame(); 
-    let variantMsg = currentVariant !== 'standard' ? ` [${currentVariant.replace('-', ' ').toUpperCase()}]` : '';
-    showMessage(`New puzzle loaded${variantMsg}. Good luck!`, 'info');
+    showMessage(`New puzzle loaded. Good luck!`, 'info');
   } catch (err) {
     showMessage(`Failed to load puzzle: ${err.message}`, 'error');
   } finally {
@@ -1349,7 +1265,7 @@ async function newGame() {
   }
 }
 
-function loadGameFromSeed(seedStr, difficultyStr, variantStr) {
+function loadGameFromSeed(seedStr, difficultyStr) {
     setLoading(true);
     state = emptyGrid();
     drafts = emptyDrafts();
@@ -1365,7 +1281,6 @@ function loadGameFromSeed(seedStr, difficultyStr, variantStr) {
     updateKeyboardUI();
 
     currentDifficulty = difficultyStr || 'custom';
-    currentVariant = variantStr || 'standard';
     
     let index = 0;
     for (let z = 0; z < 3; z++) {
@@ -1385,9 +1300,6 @@ function loadGameFromSeed(seedStr, difficultyStr, variantStr) {
     solvedGrid = computeSolutionGrid();
     const diffSelect = document.getElementById('difficulty-select');
     if (diffSelect) diffSelect.value = currentDifficulty;
-
-    const varSelect = document.getElementById('variant-select');
-    if (varSelect) varSelect.value = currentVariant;
 
     updateStatsUI();
     
@@ -1410,7 +1322,7 @@ async function checkSolution() {
   await new Promise(resolve => setTimeout(resolve, 50));
 
   try {
-    const data = check3SSC(state, 3, currentVariant);
+    const data = check3SSC(state, 3);
 
     if (data.valid) {
       isGameComplete = true; 
@@ -1545,14 +1457,6 @@ function init() {
     });
   }
 
-  const varSelect = document.getElementById('variant-select');
-  if (varSelect) {
-    varSelect.addEventListener('change', (e) => {
-      currentVariant = e.target.value;
-      savePreferences();
-    });
-  }
-
   const themeSelect = document.getElementById('theme-select');
   if (themeSelect) {
     themeSelect.addEventListener('change', (e) => {
@@ -1612,10 +1516,9 @@ function init() {
   const urlParams = new URLSearchParams(window.location.search);
   const boardSeed = urlParams.get('b');
   const difficultySeed = urlParams.get('d');
-  const variantSeed = urlParams.get('v');
 
   if (boardSeed && boardSeed.length === 27 && /^\d+$/.test(boardSeed)) {
-      loadGameFromSeed(boardSeed, difficultySeed, variantSeed);
+      loadGameFromSeed(boardSeed, difficultySeed);
       window.history.replaceState({}, document.title, window.location.pathname); 
   } else if (!loadGame()) {
       newGame();
