@@ -31,26 +31,35 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  // 1. Strict Cache-First for Navigation (HTML page)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      // Explicitly match the cached index.html or root to prevent URL-mismatch misses
+      caches.match('./index.html').then((cachedHtml) => {
+        return cachedHtml || caches.match('./').then((cachedRoot) => {
+          return cachedRoot || fetch(event.request);
+        });
+      })
+    );
+    return;
+  }
+
+  // 2. Strict Cache-First for Assets (CSS, JS, PNG)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return networkResponse;
-        })
-        .catch((err) => {
-          // If network fails (offline or Render sleeping/spinning up), fall back to cached page for navigation requests
-          if (!cachedResponse && event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-          throw err;
-        });
-
-      // Instantly return cached response to wake up UI immediately, while network fetches in background
-      return cachedResponse || fetchPromise;
+      if (cachedResponse) {
+        // Return instantly. DO NOT fetch in the background. 
+        // This prevents Render's loading screen from poisoning the cache.
+        return cachedResponse;
+      }
+      
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return networkResponse;
+      });
     })
   );
 });
